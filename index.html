@@ -203,6 +203,9 @@
     </main>
 
     <script>
+        // DIRECT GOOGLE APPS SCRIPT URL FOR GITHUB PAGES DEPLOYMENT
+        const DIRECT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzStL_GqPWHydWbBtlFZ_5fpgKzpfNxExGTMjbCsRGb3yw4retjJODvL-QOgNlKkSbj8A/exec';
+
         let fullSyncedData = {}; 
         let currentSelection = 'COMBINED';
         let isDarkMode = true;
@@ -254,25 +257,45 @@
                 syncStatus.className = 'text-amber-400 dark:text-amber-400 light:text-amber-700 flex items-center gap-1.5 font-medium';
             }
 
+            let responseData = null;
+
+            // 1. TRY LOCAL PYTHON PROXY FIRST (FOR JUPYTER / LOCALHOST)
             try {
                 const res = await fetch('/api/sync-all-sheets');
                 if (res.ok) {
-                    fullSyncedData = await res.json();
-
-                    const totalRows = Object.values(fullSyncedData).reduce((acc, curr) => acc + (curr ? curr.length : 0), 0);
-
-                    if (syncStatus) {
-                        syncStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Synced 3 Sheets (${totalRows} Rows)`;
-                        syncStatus.className = 'text-emerald-400 dark:text-emerald-400 light:text-emerald-700 flex items-center gap-1.5 font-medium';
-                    }
-
-                    calculateKpiCards();
-                    return;
+                    responseData = await res.json();
                 }
             } catch (err) {
-                console.error("Sync Error:", err);
+                console.log("[INFO] Local server proxy unavailable. Falling back to Direct Google Apps Script fetch.");
             }
 
+            // 2. FALLBACK TO DIRECT GOOGLE APPS SCRIPT FETCH (FOR GITHUB PAGES)
+            if (!responseData) {
+                try {
+                    const res = await fetch(DIRECT_APPS_SCRIPT_URL);
+                    if (res.ok) {
+                        responseData = await res.json();
+                    }
+                } catch (err) {
+                    console.error("[ERROR] Direct fetch to Google Apps Script failed:", err);
+                }
+            }
+
+            // 3. PROCESS SYNCED DATA IF SUCCESSFUL
+            if (responseData) {
+                fullSyncedData = responseData;
+                const totalRows = Object.values(fullSyncedData).reduce((acc, curr) => acc + (curr ? curr.length : 0), 0);
+
+                if (syncStatus) {
+                    syncStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Synced 3 Sheets (${totalRows} Rows)`;
+                    syncStatus.className = 'text-emerald-400 dark:text-emerald-400 light:text-emerald-700 flex items-center gap-1.5 font-medium';
+                }
+
+                calculateKpiCards();
+                return;
+            }
+
+            // 4. DISPLAY ERROR IF BOTH FETCH ATTEMPTS FAIL
             if (syncStatus) {
                 syncStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span> Sync Error';
                 syncStatus.className = 'text-red-400 dark:text-red-400 light:text-red-700 flex items-center gap-1.5 font-medium';
@@ -404,7 +427,7 @@
                 return;
             }
 
-            // 2. RENDER KPI CARDS WITH HIGH CONTRAST IN LIGHT MODE
+            // 2. RENDER KPI CARDS
             if (kpiContainer) {
                 kpiContainer.className = `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-${Math.min(5, categories.length)} gap-3.5`;
                 kpiContainer.innerHTML = categories.map((cat, idx) => {
@@ -458,7 +481,7 @@
                 }).join('');
             }
 
-            // 3. RENDER CLEAN CATEGORY NODES WITH LIGHT MODE CONTRAST
+            // 3. RENDER CLEAN CATEGORY NODES
             if (gridContainer) {
                 gridContainer.className = `grid grid-cols-1 md:grid-cols-${Math.min(5, categories.length)} gap-3 relative`;
                 gridContainer.innerHTML = categories.map((cat, idx) => {
@@ -507,7 +530,7 @@
                 }).join('');
             }
 
-            // 4. RENDER MATRIX TABLE WITH FULL LIGHT MODE CONTRAST
+            // 4. RENDER EXAGGERATED ROOT CAUSE DRILLDOWN MATRIX TABLE
             const drilldownColumns = Array.from(allRootCauseDrilldowns).sort();
             const tableHeaders = ['Problem / Category', 'Closed Items Count', ...drilldownColumns];
 
