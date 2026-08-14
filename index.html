@@ -221,7 +221,8 @@
 
                         <div class="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-transparent via-purple-400 to-transparent"></div>
 
-                        <div id="tree-root-label" class="text-xs font-black uppercase tracking-widest text-purple-400 mb-1">OVERALL COUNTS</div>
+                        <!-- DYNAMICALLY UPDATED TITLE (AVAILABILITY DRIVERS / SLEEPING CELLS DRIVERS) -->
+                        <div id="tree-root-label" class="text-xs font-black uppercase tracking-widest text-purple-400 mb-1">AVAILABILITY DRIVERS</div>
                         <div id="tree-root-count" class="text-5xl md:text-6xl font-black tracking-tight leading-none text-white my-1 drop-shadow-[0_0_12px_rgba(255,255,255,0.35)]">0</div>
 
                         <!-- DYNAMIC TECH BREAKDOWN CARD WITH COMPLETION COLOR CODING & CLOSED / TOTAL RATIOS -->
@@ -358,8 +359,14 @@
             const titleEl = document.getElementById('tech-title');
             const legendBox = document.getElementById('tech-legend-box');
             const hierarchyHeading = document.getElementById('hierarchy-heading');
+            const treeRootLabel = document.getElementById('tree-root-label');
 
             const tabPrefix = activeTab === 'AVAILABILITY' ? 'Zero Availability' : 'Sleeping Cell';
+
+            // UPDATE TOP OVERALL TITLE BASED ON ACTIVE TAB
+            if (treeRootLabel) {
+                treeRootLabel.innerText = activeTab === 'AVAILABILITY' ? 'AVAILABILITY DRIVERS' : 'SLEEPING CELLS DRIVERS';
+            }
 
             if (currentSelection === 'COMBINED') {
                 titleEl.innerText = `${tabPrefix} Dashboard`;
