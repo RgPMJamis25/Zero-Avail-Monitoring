@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Globe Zero Availability Dashboard</title>
+    <title>Globe Zero Availability & Sleeping Cell Dashboard</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -124,7 +124,7 @@
                     <i data-lucide="network" class="w-5 h-5"></i>
                 </div>
                 <div>
-                    <h1 id="tech-title" class="font-bold text-base text-white dark:text-white light:text-slate-900 leading-tight tracking-tight">Zero Availability Dashboard</h1>
+                    <h1 id="tech-title" class="font-bold text-base text-white dark:text-white light:text-slate-900 leading-tight tracking-tight">Globe Network Dashboard</h1>
                     <p class="text-[11px] text-slate-400 dark:text-slate-400 light:text-slate-600 flex items-center gap-1.5">
                         <span id="sync-status" class="text-emerald-400 dark:text-emerald-400 light:text-emerald-700 flex items-center gap-1 font-semibold">
                             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Initializing...
@@ -133,18 +133,25 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-2.5">
+            <div class="flex items-center gap-3">
+                <!-- MAIN VIEW TAB NAVIGATION -->
+                <div class="flex items-center bg-slate-950/80 dark:bg-slate-950/80 light:bg-slate-200 p-1 rounded-xl border border-slate-800 dark:border-slate-800 light:border-slate-300">
+                    <button id="tab-avail-btn" onclick="switchMainTab('AVAILABILITY')" class="px-3 py-1 rounded-lg text-xs font-black transition-all bg-purple-600 text-white shadow-md">
+                        Availability
+                    </button>
+                    <button id="tab-sleep-btn" onclick="switchMainTab('SLEEPING_CELL')" class="px-3 py-1 rounded-lg text-xs font-black transition-all text-slate-400 hover:text-white">
+                        Sleeping Cells
+                    </button>
+                </div>
+
                 <button onclick="toggleTheme()" id="theme-btn" class="p-1.5 rounded-lg border border-slate-700 dark:border-slate-700 light:border-slate-300 bg-slate-800 dark:bg-slate-800 light:bg-slate-200 text-slate-300 dark:text-slate-300 light:text-slate-800 hover:text-white light:hover:text-black transition shadow">
                     <i data-lucide="sun" id="theme-icon" class="w-4 h-4"></i>
                 </button>
 
                 <div class="flex items-center gap-1.5">
-                    <label for="tech-select" class="text-[11px] text-slate-400 dark:text-slate-400 light:text-slate-700 font-bold uppercase tracking-wider hidden sm:inline">View:</label>
+                    <label for="tech-select" class="text-[11px] text-slate-400 dark:text-slate-400 light:text-slate-700 font-bold uppercase tracking-wider hidden sm:inline">Filter:</label>
                     <select id="tech-select" onchange="onDropdownChange(this.value)" class="bg-slate-950 dark:bg-slate-950 light:bg-white text-xs font-bold text-purple-300 dark:text-purple-300 light:text-purple-800 border border-purple-500/30 light:border-slate-300 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-purple-500 shadow transition cursor-pointer">
-                        <option value="COMBINED">ALL SUMMARY (2G / 4G / 5G)</option>
-                        <option value="2G">2G AVAILABILITY</option>
-                        <option value="4G">4G / LTE AVAILABILITY</option>
-                        <option value="5G">5G AVAILABILITY</option>
+                        <!-- Populated dynamically based on Active Main Tab -->
                     </select>
                 </div>
 
@@ -163,7 +170,7 @@
             <div class="flex flex-wrap items-center justify-between border-b border-slate-800/80 dark:border-slate-800/80 light:border-slate-200 pb-3 gap-2">
                 <h2 id="hierarchy-heading" class="font-bold text-sm sm:text-base text-slate-100 dark:text-slate-100 light:text-slate-900 flex items-center gap-2">
                     <i data-lucide="git-fork" class="w-5 h-5 text-purple-400 dark:text-purple-400 light:text-purple-600"></i>
-                    Availability Drivers Breakdown
+                    Drivers Breakdown
                 </h2>
 
                 <!-- ENLARGED LEGEND BAR -->
@@ -260,9 +267,69 @@
         const DIRECT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzStL_GqPWHydWbBtlFZ_5fpgKzpfNxExGTMjbCsRGb3yw4retjJODvL-QOgNlKkSbj8A/exec';
 
         let fullSyncedData = {}; 
+        let activeTab = 'AVAILABILITY'; // Options: 'AVAILABILITY', 'SLEEPING_CELL'
         let currentSelection = 'COMBINED';
         let isDarkMode = true;
         let globalCategoryMap = {};
+
+        const DROPDOWN_OPTIONS = {
+            'AVAILABILITY': [
+                { value: 'COMBINED', label: 'ALL SUMMARY (2G / 4G / 5G)' },
+                { value: '2G', label: '2G AVAILABILITY' },
+                { value: '4G', label: '4G / LTE AVAILABILITY' },
+                { value: '5G', label: '5G AVAILABILITY' }
+            ],
+            'SLEEPING_CELL': [
+                { value: 'COMBINED', label: 'ALL SLEEPING CELLS SUMMARY' },
+                { value: '2G', label: '2G SLEEPING CELL' },
+                { value: '4G', label: '4G / LTE SLEEPING CELL' },
+                { value: '5G', label: '5G SLEEPING CELL' }
+            ]
+        };
+
+        function switchMainTab(tab) {
+            activeTab = tab;
+            const availBtn = document.getElementById('tab-avail-btn');
+            const sleepBtn = document.getElementById('tab-sleep-btn');
+
+            if (tab === 'AVAILABILITY') {
+                availBtn.className = "px-3 py-1 rounded-lg text-xs font-black transition-all bg-purple-600 text-white shadow-md";
+                sleepBtn.className = "px-3 py-1 rounded-lg text-xs font-black transition-all text-slate-400 hover:text-white";
+            } else {
+                sleepBtn.className = "px-3 py-1 rounded-lg text-xs font-black transition-all bg-purple-600 text-white shadow-md";
+                availBtn.className = "px-3 py-1 rounded-lg text-xs font-black transition-all text-slate-400 hover:text-white";
+            }
+
+            populateDropdownOptions();
+            currentSelection = 'COMBINED';
+            document.getElementById('tech-select').value = 'COMBINED';
+            updateTabHeadings();
+            calculateKpiCards();
+        }
+
+        function populateDropdownOptions() {
+            const selectEl = document.getElementById('tech-select');
+            const options = DROPDOWN_OPTIONS[activeTab];
+            selectEl.innerHTML = options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+        }
+
+        function updateTabHeadings() {
+            const titleEl = document.getElementById('tech-title');
+            const legendBox = document.getElementById('tech-legend-box');
+            const hierarchyHeading = document.getElementById('hierarchy-heading');
+
+            const tabPrefix = activeTab === 'AVAILABILITY' ? 'Zero Availability' : 'Sleeping Cell';
+
+            if (currentSelection === 'COMBINED') {
+                titleEl.innerText = `${tabPrefix} Dashboard`;
+                hierarchyHeading.innerText = `${tabPrefix} Drivers Breakdown (All Summary)`;
+                if (legendBox) legendBox.classList.remove('hidden');
+            } else {
+                titleEl.innerText = `${currentSelection} ${tabPrefix} Dashboard`;
+                hierarchyHeading.innerText = `${tabPrefix} Drivers Breakdown (${currentSelection})`;
+                if (legendBox) legendBox.classList.add('hidden');
+            }
+        }
 
         // COLOR-CODING FUNCTION FOR COMPLETION PERCENTAGES
         function getCompletionColorStyle(pct) {
@@ -350,6 +417,7 @@
                     lucide.createIcons();
                 }
             } catch (e) {}
+            populateDropdownOptions();
             syncAllSheets();
         });
 
@@ -408,9 +476,10 @@
             if (responseData) {
                 fullSyncedData = responseData;
                 const totalRows = Object.values(fullSyncedData).reduce((acc, curr) => acc + (curr ? curr.length : 0), 0);
+                const totalSheets = Object.keys(fullSyncedData).length;
 
                 if (syncStatus) {
-                    syncStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Synced 3 Sheets (${totalRows} Rows)`;
+                    syncStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Synced ${totalSheets} Sheets (${totalRows} Rows)`;
                     syncStatus.className = 'text-emerald-400 dark:text-emerald-400 light:text-emerald-700 flex items-center gap-1.5 font-medium';
                 }
 
@@ -437,9 +506,17 @@
             techList.forEach(tech => {
                 if (currentSelection !== 'COMBINED' && currentSelection !== tech) return;
 
-                const sheetKey = `${tech} AVAILABILITY`;
-                const rows = fullSyncedData[sheetKey] || [];
-                if (rows.length < 2) return;
+                // Dynamically build Sheet Key based on Active Tab
+                const sheetKey = activeTab === 'AVAILABILITY' ? `${tech} AVAILABILITY` : `${tech} Sleeping Cell`;
+
+                // Fallback search to handle minor casing or spacing discrepancies
+                let rows = fullSyncedData[sheetKey];
+                if (!rows) {
+                    const foundKey = Object.keys(fullSyncedData).find(k => k.toUpperCase().trim() === sheetKey.toUpperCase().trim());
+                    if (foundKey) rows = fullSyncedData[foundKey];
+                }
+
+                if (!rows || rows.length < 2) return;
 
                 const header = rows[0].map(c => String(c).toUpperCase().trim());
 
@@ -592,7 +669,7 @@
             const connectorTreeLine = document.getElementById('connector-tree-line');
 
             if (categories.length === 0) {
-                if (gridContainer) gridContainer.innerHTML = `<div class="col-span-5 text-center text-slate-500 py-4 font-mono">No category data found for selection.</div>`;
+                if (gridContainer) gridContainer.innerHTML = `<div class="col-span-5 text-center text-slate-500 py-8 font-mono">No category data found for ${activeTab} view.</div>`;
                 if (connectorTreeLine) connectorTreeLine.classList.add('hidden');
                 renderTableData([], []);
                 return;
@@ -801,7 +878,7 @@
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div>
                         <h3 class="font-black text-xl text-white tracking-tight">${cat.name}</h3>
-                        <p class="text-xs text-purple-400 font-bold uppercase tracking-wider">Historical Closings & Completion Details</p>
+                        <p class="text-xs text-purple-400 font-bold uppercase tracking-wider">Historical Closings & Completion Details (${activeTab})</p>
                     </div>
                     <div class="text-right">
                         <span class="text-3xl font-black ${overallStyle.text}">${overallPct}%</span>
@@ -915,21 +992,7 @@
 
         function onDropdownChange(value) {
             currentSelection = value;
-
-            const titleEl = document.getElementById('tech-title');
-            const legendBox = document.getElementById('tech-legend-box');
-            const hierarchyHeading = document.getElementById('hierarchy-heading');
-
-            if (value === 'COMBINED') {
-                titleEl.innerText = 'Zero Availability Dashboard';
-                hierarchyHeading.innerText = 'Availability Drivers Breakdown (All Summary)';
-                if (legendBox) legendBox.classList.remove('hidden');
-            } else {
-                titleEl.innerText = `${value} Zero Availability Dashboard`;
-                hierarchyHeading.innerText = `Availability Drivers Breakdown (${value})`;
-                if (legendBox) legendBox.classList.add('hidden');
-            }
-
+            updateTabHeadings();
             calculateKpiCards();
         }
     </script>
