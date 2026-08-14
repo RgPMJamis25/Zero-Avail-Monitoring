@@ -34,6 +34,18 @@
             color: #f1f5f9;
         }
 
+        /* PERMANENT OPEN ITEM NODE STYLING */
+        .inner-node-open {
+            background: rgba(245, 158, 11, 0.15) !important;
+            border: 1px solid rgba(245, 158, 11, 0.5) !important;
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.25) !important;
+        }
+        .inner-node-open-zero {
+            background: rgba(30, 41, 59, 0.4) !important;
+            border: 1px solid rgba(245, 158, 11, 0.25) !important;
+            opacity: 0.75;
+        }
+
         /* LIGHT MODE STYLING */
         .light .chart-card {
             background: #ffffff !important;
@@ -45,6 +57,16 @@
             background: #f1f5f9 !important;
             border: 1px solid #cbd5e1 !important;
             color: #0f172a !important;
+        }
+        .light .inner-node-open {
+            background: #fef3c7 !important;
+            border: 1px solid #f59e0b !important;
+            color: #78350f !important;
+        }
+        .light .inner-node-open-zero {
+            background: #f8fafc !important;
+            border: 1px solid #fcd34d !important;
+            color: #475569 !important;
         }
 
         /* CONNECTOR TREE STYLING */
@@ -88,7 +110,7 @@
             box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(110, 231, 183, 0.2);
         }
         .glow-emerald:hover {
-            box-shadow: 0 0 35px 2px rgba(16, 185, 129, 0.55), inset 0 1px 0 rgba(110, 231, 183, 0.4);
+            box-shadow: 0 0 35px 2px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(110, 231, 183, 0.4);
         }
 
         .glow-amber {
@@ -202,7 +224,7 @@
                         <div id="tree-root-label" class="text-xs font-black uppercase tracking-widest text-purple-400 mb-1">OVERALL COUNTS</div>
                         <div id="tree-root-count" class="text-5xl md:text-6xl font-black tracking-tight leading-none text-white my-1 drop-shadow-[0_0_12px_rgba(255,255,255,0.35)]">0</div>
 
-                        <!-- DYNAMIC TECH BREAKDOWN CARD WITH COMPLETION COLOR CODING -->
+                        <!-- DYNAMIC TECH BREAKDOWN CARD WITH COMPLETION COLOR CODING & CLOSED / TOTAL RATIOS -->
                         <div id="overall-tech-breakdown" class="grid grid-cols-3 gap-3 sm:gap-4 w-full mt-4 pt-4 border-t border-slate-800/80">
                             <!-- Populated Dynamically -->
                         </div>
@@ -286,6 +308,25 @@
                 { value: '5G', label: '5G SLEEPING CELL' }
             ]
         };
+
+        // HELPER TO BEAUTIFY UPPERCASED STATUS STRINGS IN THE UI
+        function toTitleCase(str) {
+            if (!str) return '';
+            return str.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+        }
+
+        // CHECK IF A STATUS IS CONSIDERED CLOSED
+        function checkIsClosed(statusStr) {
+            const uppercaseStatus = String(statusStr || '').toUpperCase();
+            return (
+                uppercaseStatus.includes('CLOSE') || 
+                uppercaseStatus.includes('CLOSED') || 
+                uppercaseStatus.includes('SOLVED') || 
+                uppercaseStatus.includes('RESOLVED') || 
+                uppercaseStatus.includes('(0) CLOSED') || 
+                uppercaseStatus === '0'
+            );
+        }
 
         function switchMainTab(tab) {
             activeTab = tab;
@@ -548,7 +589,9 @@
                     const rawCategoryName = String(row[problemIdx] || '').trim();
                     if (!rawCategoryName || rawCategoryName.toUpperCase().includes('GRAND TOTAL')) return;
 
-                    const currentStatusVal = String(row[currentStatusColIdx] || 'Unspecified Current Status').trim();
+                    // CASE-INSENSITIVE STATUS NORMALIZATION (UPPERCASE)
+                    const rawStatus = String(row[currentStatusColIdx] || 'UNSPECIFIED CURRENT STATUS').trim();
+                    const currentStatusVal = rawStatus.toUpperCase();
 
                     let rawRootCauseVal = 'Unspecified Drilldown';
                     if (rootCauseIdx !== -1 && row[rootCauseIdx] !== undefined && row[rootCauseIdx] !== null) {
@@ -567,6 +610,7 @@
                             name: rawCategoryName,
                             total: 0,
                             openTotal: 0,
+                            openTechMap: { '2G': 0, '4G': 0, '5G': 0 },
                             closedTotal: 0,
                             '2G': 0, '4G': 0, '5G': 0,
                             '2G_Closed': 0, '4G_Closed': 0, '5G_Closed': 0,
@@ -584,15 +628,8 @@
                     overallTechCounts[tech] += valCount;
                     globalGrandTotal += valCount;
 
-                    const uppercaseStatus = currentStatusVal.toUpperCase();
-                    const isClosed = (
-                        uppercaseStatus.includes('CLOSE') || 
-                        uppercaseStatus.includes('CLOSED') || 
-                        uppercaseStatus.includes('SOLVED') || 
-                        uppercaseStatus.includes('RESOLVED') || 
-                        uppercaseStatus.includes('(0) CLOSED') || 
-                        uppercaseStatus === '0'
-                    );
+                    // FLEXIBLE CASE-INSENSITIVE CHECK FOR CLOSED ITEMS
+                    const isClosed = checkIsClosed(currentStatusVal);
 
                     if (isClosed) {
                         categoryMap[rawCategoryName].closedTotal += valCount;
@@ -617,13 +654,16 @@
 
                     } else {
                         categoryMap[rawCategoryName].openTotal += valCount;
+                        categoryMap[rawCategoryName].openTechMap[tech] += valCount;
+
                         if (rawRootCauseVal) {
                             allRootCauseDrilldowns.add(rawRootCauseVal);
                             categoryMap[rawCategoryName].rootCauseMap[rawRootCauseVal] = (categoryMap[rawCategoryName].rootCauseMap[rawRootCauseVal] || 0) + valCount;
                         }
                     }
 
-                    if (currentStatusVal) {
+                    // CASE-INSENSITIVE GROUPING INTO STATUS MAP (ONLY CLOSED STATUSES LOGGED HERE)
+                    if (currentStatusVal && isClosed) {
                         if (!categoryMap[rawCategoryName].statusMap[currentStatusVal]) {
                             categoryMap[rawCategoryName].statusMap[currentStatusVal] = { total: 0, '2G': 0, '4G': 0, '5G': 0 };
                         }
@@ -638,7 +678,7 @@
             // Update Root Card Overall Counts
             document.getElementById('tree-root-count').innerText = globalGrandTotal.toLocaleString();
 
-            // Populate Breakdown Below Total Site Counts with COLOR-CODED COMPLETION BADGES
+            // Populate Breakdown Below Total Site Counts with CLOSED / TOTAL RATIOS & COLOR-CODED COMPLETION BADGES
             const overallBreakdownContainer = document.getElementById('overall-tech-breakdown');
             if (overallBreakdownContainer) {
                 const techConfigs = [
@@ -656,7 +696,13 @@
                     return `
                     <div class="${cfg.bg} border ${cfg.border} rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between items-center shadow-inner transition hover:scale-105">
                         <div class="${cfg.text} font-black text-sm sm:text-base uppercase tracking-wider">${cfg.name}</div>
-                        <div class="text-3xl sm:text-4xl font-black ${cfg.valText} my-1 leading-tight">${total.toLocaleString()}</div>
+
+                        <!-- OVERALL PER-TECH CLOSED / TOTAL RATIO FORMAT -->
+                        <div class="flex items-baseline gap-1 my-1 leading-tight">
+                            <span class="text-2xl sm:text-3xl font-black ${cfg.valText}">${closed.toLocaleString()}</span>
+                            <span class="text-base sm:text-lg font-bold text-slate-400">/ ${total.toLocaleString()}</span>
+                        </div>
+
                         <div class="text-xs ${style.text} font-black ${style.bg} px-2.5 py-1 rounded-full border ${style.border} ${style.glow}">
                             ${pct}% Complete
                         </div>
@@ -677,23 +723,34 @@
 
             if (connectorTreeLine) connectorTreeLine.classList.remove('hidden');
 
-            // Render Level 2 Hierarchy (DYNAMIC COLOR-CODED COMPLETION LAYOUT)
+            // Render Level 2 Hierarchy (UNIFORM ALIGNMENT: FIXED PERMANENT OPEN & CLOSED STATUS NODES)
             if (gridContainer) {
                 gridContainer.className = `grid grid-cols-1 md:grid-cols-${Math.min(5, categories.length)} gap-3.5 relative`;
                 gridContainer.innerHTML = categories.map((cat, idx) => {
                     const theme = COLOR_THEMES[idx % COLOR_THEMES.length];
-                    const statusEntries = Object.entries(cat.statusMap);
+
+                    // SORT ONLY CLOSED STATUSES ALPHABETICALLY BELOW
+                    const closedStatusEntries = Object.entries(cat.statusMap).sort(([aName], [bName]) => aName.localeCompare(bName));
+
+                    // FALLBACK: IF CATEGORY HAS 0 CLOSED ITEMS, ADD A PERMANENT "Close" NODE WITH 0 COUNTS
+                    if (closedStatusEntries.length === 0) {
+                        closedStatusEntries.push(['Close', { total: 0, '2G': 0, '4G': 0, '5G': 0 }]);
+                    }
 
                     const techCompletion = ['2G', '4G', '5G'].map(tech => {
                         const total = cat[tech];
                         const closed = cat[`${tech}_Closed`];
                         const pct = total > 0 ? Math.round((closed / total) * 100) : 0;
                         const style = getCompletionColorStyle(pct);
-                        return { tech, total, pct, style };
+                        return { tech, total, closed, pct, style };
                     });
 
                     const overallCompletion = cat.total > 0 ? Math.round((cat.closedTotal / cat.total) * 100) : 0;
                     const overallStyle = getCompletionColorStyle(overallCompletion);
+
+                    const openCount = cat.openTotal || 0;
+                    const hasOpen = openCount > 0;
+                    const openClass = hasOpen ? 'inner-node-open' : 'inner-node-open-zero';
 
                     return `
                     <div onclick="openCardModal('${cat.name.replace(/'/g, "\\'")}')" 
@@ -707,8 +764,16 @@
                                 <i data-lucide="layers" class="w-4 h-4 ${theme.text} shrink-0"></i>
                             </div>
 
-                            <!-- LARGE COUNT NUMBER -->
-                            <div class="text-5xl md:text-6xl font-black ${theme.text} leading-none drop-shadow-[0_0_10px_rgba(255,255,255,0.25)]">${cat.total.toLocaleString()}</div>
+                            <!-- LARGE COUNT NUMBER FORMATTED AS CLOSED / TOTAL -->
+                            <div class="flex items-baseline gap-1.5 leading-none">
+                                <span class="text-4xl md:text-5xl font-black ${theme.text} drop-shadow-[0_0_10px_rgba(255,255,255,0.25)]">
+                                    ${cat.closedTotal.toLocaleString()}
+                                </span>
+                                <span class="text-xl md:text-2xl font-extrabold text-slate-400">
+                                    / ${cat.total.toLocaleString()}
+                                </span>
+                            </div>
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Closed / Total Category Count</div>
 
                             <!-- UNWRAPPED DYNAMICALLY COLOR-CODED COMPLETION RATE BAR -->
                             <div class="w-full ${overallStyle.bg} border ${overallStyle.border} rounded-xl py-1.5 px-3 flex items-center justify-between shadow-inner mt-2">
@@ -719,7 +784,7 @@
                             </div>
                         </div>
 
-                        <!-- ENLARGED CATEGORY TECH BREAKDOWN BOXES WITH COLOR CODING -->
+                        <!-- ENLARGED CATEGORY TECH BREAKDOWN BOXES WITH COLOR CODING & CLOSED / TOTAL RATIOS -->
                         <div class="pt-3 border-t border-slate-800/80 dark:border-slate-800/80 light:border-slate-200 space-y-2.5">
                             <div class="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-400 light:text-slate-600 flex justify-between items-center">
                                 <span>Tech Completion</span>
@@ -734,7 +799,7 @@
                                         <span class="text-xs font-black text-indigo-300">2G</span>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <span class="text-sm font-black text-white">${techCompletion[0].total}</span>
+                                        <span class="text-xs font-black text-slate-200">${techCompletion[0].closed} / ${techCompletion[0].total}</span>
                                         <span class="text-xs font-black ${techCompletion[0].style.text} ${techCompletion[0].style.badge} px-2 py-0.5 rounded-md border">${techCompletion[0].pct}%</span>
                                     </div>
                                 </div>
@@ -746,7 +811,7 @@
                                         <span class="text-xs font-black text-purple-300">4G</span>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <span class="text-sm font-black text-white">${techCompletion[1].total}</span>
+                                        <span class="text-xs font-black text-slate-200">${techCompletion[1].closed} / ${techCompletion[1].total}</span>
                                         <span class="text-xs font-black ${techCompletion[1].style.text} ${techCompletion[1].style.badge} px-2 py-0.5 rounded-md border">${techCompletion[1].pct}%</span>
                                     </div>
                                 </div>
@@ -758,19 +823,54 @@
                                         <span class="text-xs font-black text-emerald-300">5G</span>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <span class="text-sm font-black text-white">${techCompletion[2].total}</span>
+                                        <span class="text-xs font-black text-slate-200">${techCompletion[2].closed} / ${techCompletion[2].total}</span>
                                         <span class="text-xs font-black ${techCompletion[2].style.text} ${techCompletion[2].style.badge} px-2 py-0.5 rounded-md border">${techCompletion[2].pct}%</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- STATUS BREAKDOWN NODES -->
+                            <!-- UNIFORM STATUS BREAKDOWN LIST (FIXED OPEN NODE AT TOP & CLOSED NODE BELOW) -->
                             <div class="space-y-1.5 text-[11px] font-medium pt-2 border-t border-slate-800/60 dark:border-slate-800/60 light:border-slate-200">
-                                ${statusEntries.length === 0 ? `<span class="text-slate-500 italic text-[10px]">No Current Status logged</span>` : 
-                                    statusEntries.map(([sName, sData]) => `
-                                    <div class="p-2 rounded-xl inner-node space-y-1.5 shadow-sm">
+
+                                <!-- 1. PERMANENT OPEN ITEMS NODE (ALWAYS PRESENT AT TOP FOR PERFECT GRID ALIGNMENT) -->
+                                <div class="p-2 rounded-xl ${openClass} space-y-1.5 transition-all">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-1.5 truncate pr-1">
+                                            ${hasOpen ? `<span class="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0"></span>` : '<span class="w-2 h-2 rounded-full bg-slate-500 shrink-0"></span>'}
+                                            <span class="text-[9px] font-black uppercase tracking-wider ${hasOpen ? 'bg-amber-500/30 text-amber-300 dark:text-amber-300 light:text-amber-800' : 'bg-slate-700/40 text-slate-400'} px-1.5 py-0.5 rounded border ${hasOpen ? 'border-amber-500/50' : 'border-slate-600/30'} shrink-0">
+                                                OPEN
+                                            </span>
+                                            <span class="truncate font-bold text-xs leading-tight ${hasOpen ? 'text-amber-200 dark:text-amber-200 light:text-amber-900 font-extrabold' : 'text-slate-400 dark:text-slate-400 light:text-slate-600'}">
+                                                Open Items
+                                            </span>
+                                        </div>
+                                        <b class="${hasOpen ? 'text-amber-400 dark:text-amber-400 light:text-amber-900 font-black text-base' : 'text-slate-400 font-bold text-sm'}">
+                                            ${openCount}
+                                        </b>
+                                    </div>
+
+                                    ${currentSelection === 'COMBINED' ? `
+                                    <div class="flex items-center justify-between gap-1 pt-1 border-t ${hasOpen ? 'border-amber-500/30' : 'border-slate-800/40 dark:border-slate-800/40 light:border-slate-300'}">
+                                        <span class="flex-1 text-center px-1 py-0.5 rounded bg-indigo-600 border border-indigo-400 text-white font-extrabold text-xs shadow-[0_0_8px_rgba(79,70,229,0.4)]" title="2G Open">
+                                            ${cat.openTechMap['2G']}
+                                        </span>
+                                        <span class="flex-1 text-center px-1 py-0.5 rounded bg-purple-600 border border-purple-400 text-white font-extrabold text-xs shadow-[0_0_8px_rgba(168,85,247,0.4)]" title="LTE Open">
+                                            ${cat.openTechMap['4G']}
+                                        </span>
+                                        <span class="flex-1 text-center px-1 py-0.5 rounded bg-emerald-600 border border-emerald-400 text-white font-extrabold text-xs shadow-[0_0_8px_rgba(16,185,129,0.4)]" title="5G Open">
+                                            ${cat.openTechMap['5G']}
+                                        </span>
+                                    </div>
+                                    ` : ''}
+                                </div>
+
+                                <!-- 2. CLOSED/RESOLVED STATUS NODES (ALWAYS PRESENT BELOW) -->
+                                ${closedStatusEntries.map(([sName, sData]) => `
+                                    <div class="p-2 rounded-xl inner-node space-y-1.5 transition-all">
                                         <div class="flex items-center justify-between">
-                                            <span class="truncate pr-1 font-bold text-xs leading-tight text-slate-200 dark:text-slate-200 light:text-slate-800" title="${sName}">${sName}</span>
+                                            <span class="truncate font-bold text-xs leading-tight text-slate-200 dark:text-slate-200 light:text-slate-800" title="${sName}">
+                                                ${toTitleCase(sName)}
+                                            </span>
                                             <b class="${theme.badge} font-black text-sm">${sData.total}</b>
                                         </div>
 
